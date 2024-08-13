@@ -1192,14 +1192,30 @@ BOOL LLToolPie::handleTooltipObject( LLViewerObject* hover_object, std::string l
             || !existing_inspector->getVisible()
             || existing_inspector->getKey()["avatar_id"].asUUID() != hover_object->getID())
         {
+            // Get Group Name.
+            std::string group_title;
+            if (gSavedSettings.getBool("ShowAdvancedHoverTips"))
+            {
+                LLNameValue* group = hover_object->getNVPair("Title");
+                if (group)
+                {
+                    group_title = group->getString();
+                    if (!group_title.empty())
+                    {
+                        group_title += "\n";
+                    }
+                }
+            }
             // Try to get display name + username
             std::string final_name;
             LLAvatarName av_name;
             if (LLAvatarNameCache::get(hover_object->getID(), &av_name))
             {
 // [RLVa:KB] - Checked: RLVa-1.2.2
-                final_name = (RlvActions::canShowName(RlvActions::SNC_DEFAULT, hover_object->getID())) ? av_name.getCompleteName() : RlvStrings::getAnonym(av_name);
-// [/RLVa:KB]
+                final_name = (RlvActions::canShowName(RlvActions::SNC_DEFAULT, hover_object->getID()))
+                                 ? group_title + " - " + av_name.getCompleteName()
+                                 : RlvStrings::getAnonym(av_name);
+                // [/RLVa:KB]
 //              final_name = av_name.getCompleteName();
             }
             else
@@ -1318,6 +1334,7 @@ BOOL LLToolPie::handleTooltipObject( LLViewerObject* hover_object, std::string l
                 LLStringUtil::format_map_t args;
                 // Get Position
                 LLViewerRegion* region = gAgent.getRegion();
+                LLSelectNode* nodep  = LLSelectMgr::getInstance()->getHoverNode();
                 if (region)
                 {
                     LLVector3 objectPosition = region->getPosRegionFromGlobal(hover_object->getPositionGlobal());
@@ -1337,6 +1354,22 @@ BOOL LLToolPie::handleTooltipObject( LLViewerObject* hover_object, std::string l
                     args["OBJECT_DISTANCE"] = llformat("%.02f", distance);
                     tooltip_msg.append("\n" + LLTrans::getString("TooltipDistance", args));
                 }
+
+                // Get Prim Owner
+                LLUUID owner = nodep->mPermissions->getOwner();
+                std::string final_name = "Loading Name...";
+                if (!owner.isNull())
+                {
+                    LLAvatarName av_name;
+                    if (LLAvatarNameCache::get(owner, &av_name))
+                    {
+                        final_name = (RlvActions::canShowName(RlvActions::SNC_DEFAULT, hover_object->getID()))
+                                         ? av_name.getCompleteName()
+                                         : RlvStrings::getAnonym(av_name);
+                    }
+                }
+                args["PRIM_OWNER"] = " " + final_name;
+                tooltip_msg.append("\n" + LLTrans::getString("TooltipOwner", args));
 
                 // Get Prim Count
                 args["PRIM_COUNT"] = llformat("%d", LLSelectMgr::getInstance()->getHoverObjects()->getObjectCount());
